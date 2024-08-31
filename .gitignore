@@ -1,0 +1,9 @@
+/.idea/
+output
+__pycache__
+*.npy
+*.pkl
+*.pdf
+*.ply
+*.tar
+log/
