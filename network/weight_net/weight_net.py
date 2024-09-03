@@ -1,6 +1,3 @@
-import sys 
-sys.path.append("/home/zhangyuekun/GeoTransformer")
-sys.path.append("/home/zhangyuekun/GeoTransformer/experiments")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -31,12 +28,12 @@ from network.weight_net.test import Tester
 def load_template():
     # cat_name2id = {'bottle': 1, 'bowl': 2, 'camera': 3, 'can': 4, 'laptop': 5, 'mug': 6}
     template = []
-    bottle = np.load("/home/zhangyuekun/GPV_Pose/network/weight_net/template/bottle.npy")
-    bowl = np.load("/home/zhangyuekun/GPV_Pose/network/weight_net/template/bowl.npy")
-    camera = np.load("/home/zhangyuekun/GPV_Pose/network/weight_net/template/camera.npy")
-    can = np.load("/home/zhangyuekun/GPV_Pose/network/weight_net/template/can.npy")
-    laptop = np.load("/home/zhangyuekun/GPV_Pose/network/weight_net/template/laptop.npy")
-    mug = np.load("/home/zhangyuekun/GPV_Pose/network/weight_net/template/mug.npy")
+    bottle = np.load("/home/zhangyuekun/GSV_Pose/network/weight_net/template/bottle.npy")
+    bowl = np.load("/home/zhangyuekun/GSV_Pose/network/weight_net/template/bowl.npy")
+    camera = np.load("/home/zhangyuekun/GSV_Pose/network/weight_net/template/camera.npy")
+    can = np.load("/home/zhangyuekun/GSV_Pose/network/weight_net/template/can.npy")
+    laptop = np.load("/home/zhangyuekun/GSV_Pose/network/weight_net/template/laptop.npy")
+    mug = np.load("/home/zhangyuekun/GSV_Pose/network/weight_net/template/mug.npy")
     template.append(bottle)
     template.append(bowl)
     template.append(camera)
@@ -76,9 +73,6 @@ class weighter():
 
 def compareOverlap(pt1,pt2,weight):
     n = 1028
-    # pt1 = np.load('/home/zhangyuekun/GeoTransformer/experiments/gentransformer.NOCS/ref_points_f.npy') # 1028 * 3
-    # pt2 = np.load("/home/zhangyuekun/GeoTransformer/experiments/gentransformer.NOCS/ref_corr_points.npy") # n * 3
-    # weight = np.load("/home/zhangyuekun/GeoTransformer/experiments/gentransformer.NOCS/corr_scores.npy")
     weight = np.asarray(weight.cpu())
 
     cnt = 0
@@ -86,8 +80,6 @@ def compareOverlap(pt1,pt2,weight):
     weight = 0.3+(weight-np.min(weight))/(np.max(weight)-np.min(weight))
     weight = 0.3+((1-0.3)/(np.max(weight)-np.min(weight)))*(weight-np.min(weight))
 
-    # print("min",min(weight))
-    # print("max",max(weight))
     
     # 需要去重（source 和 ref 中都有重采样的重复点）重复点保留最大权重
     rep_index = []
@@ -112,11 +104,7 @@ def compareOverlap(pt1,pt2,weight):
                 # print(weight_all[i],"+",weight[j]*0.7)
                 weight_all[i] += weight[j]*0.7
                 break
-    # print(cnt)
-    # for i in range(len(weight_all)):
-        # print(weight_all[i])
-    # print(max(weight_all))
-    # np.save("/home/zhangyuekun/GPV_Pose/vote_weight/"+str(index)+"_weight.npy",weight_all)
+
     return weight_all
 
 

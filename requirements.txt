@@ -185,3 +185,10 @@ yacs==0.1.8
 yapf==0.31.0
 yarl==1.7.2
 zipp==3.8.0
+coloredlogs
+easydict
+nibabel
+open3d==0.11.2
+einops
+ipdb
+tensorboardX
