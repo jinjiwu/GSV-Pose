@@ -10,6 +10,7 @@ from tools.solver_utils import build_lr_scheduler, build_optimizer_with_params
 # important parameters used here
 # total_iters: total_epoch x iteration per epoch
 
+
 def build_lr_rate(optimizer, total_iters):
     # build cfg from flags
     cfg = dict(
@@ -60,12 +61,16 @@ def get_gt_v(Rs, axis=2):
     bs = Rs.shape[0]  # bs x 3 x 3
     # TODO use 3 axis, the order remains: do we need to change order?
     if axis == 3:
-        corners = torch.tensor([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=torch.float).to(Rs.device)
+        corners = torch.tensor([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=torch.float).to(
+            Rs.device
+        )
         corners = corners.view(1, 3, 3).repeat(bs, 1, 1)  # bs x 3 x 3
         gt_vec = torch.bmm(Rs, corners).transpose(2, 1).reshape(bs, -1)
     else:
         assert axis == 2
-        corners = torch.tensor([[0, 0, 1], [0, 1, 0], [0, 0, 0]], dtype=torch.float).to(Rs.device)
+        corners = torch.tensor([[0, 0, 1], [0, 1, 0], [0, 0, 0]], dtype=torch.float).to(
+            Rs.device
+        )
         corners = corners.view(1, 3, 3).repeat(bs, 1, 1)  # bs x 3 x 3
         gt_vec = torch.bmm(Rs, corners).transpose(2, 1).reshape(bs, -1)
     gt_green = gt_vec[:, 3:6]

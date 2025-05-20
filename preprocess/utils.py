@@ -26,6 +26,210 @@ def setup_logger(logger_name, log_file, level=logging.INFO):
     return logger
 
 
+def load_obj(path_to_file):
+    """Load obj file.
+
+    Args:
+        path_to_file: path
+
+    Returns:
+        vertices: ndarray
+        faces: ndarray, index of triangle vertices
+
+    """
+    vertices = []
+    faces = []
+    with open(path_to_file, "r") as f:
+        for line in f:
+            if line[:2] == "v ":
+                vertex = line[2:].strip().split(" ")
+                vertex = [float(xyz) for xyz in vertex]
+                vertices.append(vertex)
+            elif line[0] == "f":
+                face = line[1:].replace("//", "/").strip().split(" ")
+                face = [int(idx.split("/")[0]) - 1 for idx in face]
+                faces.append(face)
+            else:
+                continue
+    vertices = np.asarray(vertices)
+    faces = np.asarray(faces)
+    return vertices, faces
+
+
+def create_sphere():
+    # 642 verts, 1280 faces,
+    verts, faces = load_obj("assets/sphere_mesh_template.obj")
+    return verts, faces
+
+
+def random_point(face_vertices):
+    """Sampling point using Barycentric coordiante."""
+    r1, r2 = np.random.random(2)
+    sqrt_r1 = np.sqrt(r1)
+    point = (
+        (1 - sqrt_r1) * face_vertices[0, :]
+        + sqrt_r1 * (1 - r2) * face_vertices[1, :]
+        + sqrt_r1 * r2 * face_vertices[2, :]
+    )
+
+    return point
+
+
+def pairwise_distance(A, B):
+    """Compute pairwise distance of two point clouds.point
+
+    Args:
+        A: n x 3 numpy array
+        B: m x 3 numpy array
+
+    Return:
+        C: n x m numpy array
+
+    """
+    diff = A[:, :, None] - B[:, :, None].T
+    C = np.sqrt(np.sum(diff**2, axis=1))
+
+    return C
+
+
+def uniform_sample(vertices, faces, n_samples, with_normal=False):
+    """Sampling points according to the area of mesh surface."""
+    sampled_points = np.zeros((n_samples, 3), dtype=float)
+    normals = np.zeros((n_samples, 3), dtype=float)
+    faces = vertices[faces]
+    vec_cross = np.cross(
+        faces[:, 1, :] - faces[:, 0, :], faces[:, 2, :] - faces[:, 0, :]
+    )
+    face_area = 0.5 * np.linalg.norm(vec_cross, axis=1)
+    cum_area = np.cumsum(face_area)
+    for i in range(n_samples):
+        face_id = np.searchsorted(cum_area, np.random.random() * cum_area[-1])
+        sampled_points[i] = random_point(faces[face_id, :, :])
+        normals[i] = vec_cross[face_id]
+    normals = normals / np.linalg.norm(normals, axis=1, keepdims=True)
+    if with_normal:
+        sampled_points = np.concatenate((sampled_points, normals), axis=1)
+    return sampled_points
+
+
+def farthest_point_sampling(points, n_samples):
+    """Farthest point sampling."""
+    selected_pts = np.zeros((n_samples,), dtype=int)
+    dist_mat = pairwise_distance(points, points)
+    # start from first point
+    pt_idx = 0
+    dist_to_set = dist_mat[:, pt_idx]
+    for i in range(n_samples):
+        selected_pts[i] = pt_idx
+        dist_to_set = np.minimum(dist_to_set, dist_mat[:, pt_idx])
+        pt_idx = np.argmax(dist_to_set)
+    return selected_pts
+
+
+def sample_points_from_mesh(path, n_pts, with_normal=False, fps=False, ratio=2):
+    """Uniformly sampling points from mesh model.
+
+    Args:
+        path: path to OBJ file.
+        n_pts: int, number of points being sampled.
+        with_normal: return points with normal, approximated by mesh triangle normal
+        fps: whether to use fps for post-processing, default False.
+        ratio: int, if use fps, sample ratio*n_pts first, then use fps to sample final output.
+
+    Returns:
+        points: n_pts x 3, n_pts x 6 if with_normal = True
+
+    """
+    vertices, faces = load_obj(path)
+    if fps:
+        points = uniform_sample(vertices, faces, ratio * n_pts, with_normal)
+        pts_idx = farthest_point_sampling(points[:, :3], n_pts)
+        points = points[pts_idx]
+    else:
+        points = uniform_sample(vertices, faces, n_pts, with_normal)
+    return points
+
+
+def load_depth(img_path):
+    """Load depth image from img_path."""
+    depth_path = img_path + "_depth.png"
+    depth = cv2.imread(depth_path, -1)
+    if len(depth.shape) == 3:
+        # This is encoded depth image, let's convert
+        # NOTE: RGB is actually BGR in opencv
+        depth16 = depth[:, :, 1] * 256 + depth[:, :, 2]
+        depth16 = np.where(depth16 == 32001, 0, depth16)
+        depth16 = depth16.astype(np.uint16)
+    elif len(depth.shape) == 2 and depth.dtype == "uint16":
+        depth16 = depth
+    else:
+        assert False, "[ Error ]: Unsupported depth type."
+    return depth16
+
+
+def get_bbox(bbox):
+    """Compute square image crop window."""
+    y1, x1, y2, x2 = bbox
+    img_width = 480
+    img_length = 640
+    window_size = (max(y2 - y1, x2 - x1) // 40 + 1) * 40
+    window_size = min(window_size, 440)
+    center = [(y1 + y2) // 2, (x1 + x2) // 2]
+    rmin = center[0] - int(window_size / 2)
+    rmax = center[0] + int(window_size / 2)
+    cmin = center[1] - int(window_size / 2)
+    cmax = center[1] + int(window_size / 2)
+    if rmin < 0:
+        delt = -rmin
+        rmin = 0
+        rmax += delt
+    if cmin < 0:
+        delt = -cmin
+        cmin = 0
+        cmax += delt
+    if rmax > img_width:
+        delt = rmax - img_width
+        rmax = img_width
+        rmin -= delt
+    if cmax > img_length:
+        delt = cmax - img_length
+        cmax = img_length
+        cmin -= delt
+    return rmin, rmax, cmin, cmax
+
+
+def compute_sRT_errors(sRT1, sRT2):
+    """
+    Args:
+        sRT1: [4, 4]. homogeneous affine transformation
+        sRT2: [4, 4]. homogeneous affine transformation
+
+    Returns:
+        R_error: angle difference in degree,
+        T_error: Euclidean distance
+        IoU: relative scale error
+
+    """
+    try:
+        assert np.array_equal(sRT1[3, :], sRT2[3, :])
+        assert np.array_equal(sRT1[3, :], np.array([0, 0, 0, 1]))
+    except AssertionError:
+        print(sRT1[3, :], sRT2[3, :])
+
+    s1 = np.cbrt(np.linalg.det(sRT1[:3, :3]))
+    R1 = sRT1[:3, :3] / s1
+    T1 = sRT1[:3, 3]
+    s2 = np.cbrt(np.linalg.det(sRT2[:3, :3]))
+    R2 = sRT2[:3, :3] / s2
+    T2 = sRT2[:3, 3]
+    R12 = R1 @ R2.transpose()
+    R_error = np.arccos(np.clip((np.trace(R12) - 1) / 2, -1.0, 1.0)) * 180 / np.pi
+    T_error = np.linalg.norm(T1 - T2)
+    IoU = np.abs(s1 - s2) / s2
+
+    return R_error, T_error, IoU
+
+
 ############################################################
 #  Evaluation
 ############################################################
@@ -38,6 +242,7 @@ def get_3d_bbox(size, shift=0):
         shift: [3] or scalar
     Returns:
         bbox_3d: [3, N]
+
     """
     bbox_3d = (
         np.array(
@@ -63,8 +268,10 @@ def transform_coordinates_3d(coordinates, sRT):
     Args:
         coordinates: [3, N]
         sRT: [4, 4]
+
     Returns:
         new_coordinates: [3, N]
+
     """
     assert coordinates.shape[0] == 3
     coordinates = np.vstack(
@@ -153,14 +360,17 @@ def compute_IoU_matches(
     score_threshold=0,
 ):
     """Find matches between NOCS prediction and ground truth instances.
+
     Args:
         size: 3D bounding box size
         bboxes: 2D bounding boxes
+
     Returns:
         gt_matches: 2-D array. For each GT box it has the index of the matched predicted box.
         pred_matches: 2-D array. For each predicted box, it has the index of the matched ground truth box.
         overlaps: IoU overlaps.
         indices:
+
     """
     num_pred = len(pred_class_ids)
     num_gt = len(gt_class_ids)
@@ -221,6 +431,7 @@ def compute_RT_errors(sRT_1, sRT_2, class_id, handle_visibility, synset_names):
     Args:
         sRT_1: [4, 4]. homogeneous affine transformation
         sRT_2: [4, 4]. homogeneous affine transformation
+
     Returns:
         theta: angle difference of R in degree
         shift: l2 difference of T in centimeter
@@ -262,8 +473,10 @@ def compute_RT_overlaps(
     gt_class_ids, gt_sRT, gt_handle_visibility, pred_class_ids, pred_sRT, synset_names
 ):
     """Finds overlaps between prediction and ground truth instances.
+
     Returns:
         overlaps:
+
     """
     num_pred = len(pred_class_ids)
     num_gt = len(gt_class_ids)
@@ -357,14 +570,15 @@ def compute_mAP(
     iou_3d_thresholds=[0.1],
     iou_pose_thres=0.1,
     use_matches_for_pose=False,
-    cls_ids=None,
 ):
     """Compute mean Average Precision.
+
     Returns:
         iou_aps:
         pose_aps:
         iou_acc:
         pose_acc:
+
     """
     synset_names = ["BG", "bottle", "bowl", "camera", "can", "laptop", "mug"]
     num_classes = len(synset_names)
@@ -374,8 +588,6 @@ def compute_mAP(
     num_shift_thres = len(shift_thres_list)
     iou_thres_list = list(iou_3d_thresholds)
     num_iou_thres = len(iou_thres_list)
-    if cls_ids is None:
-        cls_ids = range(1, num_classes)
 
     if use_matches_for_pose:
         assert iou_pose_thres in iou_thres_list
@@ -408,20 +620,20 @@ def compute_mAP(
     # loop over results to gather pred matches and gt matches for iou and pose metrics
     progress = 0
     for progress, result in enumerate(tqdm(pred_results)):
-        gt_class_ids = np.array(result["gt_class_ids"]).astype(np.int32)
-        gt_RT = np.array(result["gt_RTs"])
+        gt_class_ids = result["gt_class_ids"].astype(np.int32)
+        gt_sRT = np.array(result["gt_RTs"])
         gt_size = np.array(result["gt_scales"])
-        gt_handle_visibility = np.array(result["gt_handle_visibility"])
+        gt_handle_visibility = result["gt_handle_visibility"]
 
-        pred_class_ids = np.array(result["pred_class_ids"])
+        pred_class_ids = result["pred_class_ids"]
         pred_sRT = np.array(result["pred_RTs"])
-        pred_size = np.array(result["pred_scales"])
-        pred_scores = np.array(result["pred_scores"])
+        pred_size = result["pred_scales"]
+        pred_scores = result["pred_scores"]
 
         if len(gt_class_ids) == 0 and len(pred_class_ids) == 0:
             continue
 
-        for cls_id in cls_ids:
+        for cls_id in range(1, num_classes):
             # get gt and predictions in this class
             cls_gt_class_ids = (
                 gt_class_ids[gt_class_ids == cls_id]
@@ -429,7 +641,7 @@ def compute_mAP(
                 else np.zeros(0)
             )
             cls_gt_sRT = (
-                gt_RT[gt_class_ids == cls_id]
+                gt_sRT[gt_class_ids == cls_id]
                 if len(gt_class_ids)
                 else np.zeros((0, 4, 4))
             )
@@ -573,7 +785,7 @@ def compute_mAP(
             pose_gt_matches_all[cls_id][:, :, gt_start:gt_end] = pose_cls_gt_match
 
     # trim zeros
-    for cls_id in cls_ids:
+    for cls_id in range(num_classes):
         # IoU
         iou_pred_matches_all[cls_id] = iou_pred_matches_all[cls_id][
             :, : iou_pred_count[cls_id]
@@ -603,12 +815,12 @@ def compute_mAP(
                 iou_pred_scores_all[cls_id][s, :],
                 iou_gt_matches_all[cls_id][s, :],
             )
-    iou_aps[-1, :] = np.sum(iou_aps[1:-1, :], axis=0) / len(cls_ids)
-    iou_acc[-1, :] = np.sum(iou_acc[1:-1, :], axis=0) / len(cls_ids)
+    iou_aps[-1, :] = np.mean(iou_aps[1:-1, :], axis=0)
+    iou_acc[-1, :] = np.mean(iou_acc[1:-1, :], axis=0)
     # compute pose mAP
     for i, degree_thres in enumerate(degree_thres_list):
         for j, shift_thres in enumerate(shift_thres_list):
-            for cls_id in cls_ids:
+            for cls_id in range(1, num_classes):
                 cls_pose_pred_matches_all = pose_pred_matches_all[cls_id][i, j, :]
                 cls_pose_gt_matches_all = pose_gt_matches_all[cls_id][i, j, :]
                 cls_pose_pred_scores_all = pose_pred_scores_all[cls_id][i, j, :]
@@ -617,8 +829,8 @@ def compute_mAP(
                     cls_pose_pred_scores_all,
                     cls_pose_gt_matches_all,
                 )
-            pose_aps[-1, i, j] = np.sum(pose_aps[1:-1, i, j]) / len(cls_ids)
-            pose_acc[-1, i, j] = np.sum(pose_acc[1:-1, i, j]) / len(cls_ids)
+            pose_aps[-1, i, j] = np.mean(pose_aps[1:-1, i, j])
+            pose_acc[-1, i, j] = np.mean(pose_acc[1:-1, i, j])
 
     # save results to pkl
     result_dict = {}
@@ -715,6 +927,7 @@ def calculate_2d_projections(coordinates_3d, intrinsics):
     Args:
         coordinates_3d: [3, N]
         intrinsics: [3, 3]
+
     Returns:
         projected_coordinates: [N, 2]
     """
@@ -826,77 +1039,3 @@ def draw_detections(
     cv2.imwrite(out_path, img)
     # cv2.imshow('vis', img)
     # cv2.waitKey(0)
-
-
-def draw_detections(
-    img,
-    out_dir,
-    data_name,
-    img_scene,
-    img_id,
-    intrinsics,
-    pred_sRT,
-    pred_size,
-    pred_class_ids,
-    gt_sRT,
-    gt_size,
-    gt_class_ids,
-    points_2d=None,
-    nocs_sRT=None,
-    nocs_size=None,
-    nocs_class_ids=None,
-    draw_gt=True,
-    draw_nocs=False,
-):
-    """Visualize pose predictions."""
-    if os.path.exists(out_dir) is False:
-        os.makedirs(out_dir)
-
-    out_path = os.path.join(
-        out_dir, "{}_{}_{}_pred.png".format(data_name, img_scene, img_id)
-    )
-    print("out_path", out_path)
-    # draw nocs results - BLUE color
-    if draw_nocs:
-        for i in range(nocs_sRT.shape[0]):
-            if nocs_class_ids[i] in [1, 2, 4]:
-                sRT = align_rotation(nocs_sRT[i, :, :])
-            else:
-                sRT = nocs_sRT[i, :, :]
-            bbox_3d = get_3d_bbox(nocs_size[i, :], 0)
-            transformed_bbox_3d = transform_coordinates_3d(bbox_3d, sRT)
-            projected_bbox = calculate_2d_projections(transformed_bbox_3d, intrinsics)
-            img = draw_bboxes(img, projected_bbox, (255, 0, 0))
-    # darw ground truth - GREEN color
-    if draw_gt and False:
-        for i in range(gt_sRT.shape[0]):
-            if gt_class_ids[i] in [1, 2, 4]:
-                sRT = align_rotation(gt_sRT[i, :, :])
-            else:
-                sRT = gt_sRT[i, :, :]
-            bbox_3d = get_3d_bbox(gt_size[i, :], 0)
-            transformed_bbox_3d = transform_coordinates_3d(bbox_3d, sRT)
-            projected_bbox = calculate_2d_projections(transformed_bbox_3d, intrinsics)
-            img = draw_bboxes(img, projected_bbox, (0, 255, 0))
-    # darw prediction - RED color
-    for i in range(pred_sRT.shape[0]):
-        if pred_class_ids[i] in [1, 2, 4]:
-            sRT = align_rotation(pred_sRT[i, :, :])
-        else:
-            sRT = pred_sRT[i, :, :]
-        bbox_3d = get_3d_bbox(pred_size[i, :], 0)
-        transformed_bbox_3d = transform_coordinates_3d(bbox_3d, sRT)
-        projected_bbox = calculate_2d_projections(transformed_bbox_3d, intrinsics)
-        # img = draw_bboxes(img, points_2d[i].cpu(), (255, 0, 0))
-        img = draw_bboxes(img, projected_bbox, (0, 0, 255))
-    # if points_2d.shape[0] == pred_sRT.shape[0]:
-    #     for i in range(points_2d.shape[0]):
-    #         img = draw_bboxes(img,points_2d[i].detach().cpu(),(255,0,0))
-
-    cv2.imwrite(out_path, img)
-    # cv2.imshow('vis', img)
-    # cv2.waitKey(0)
-
-
-def draw_img(p, img):
-    cv2.imwrite(p, img)

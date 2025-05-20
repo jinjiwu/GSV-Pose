@@ -142,8 +142,8 @@ class PoseDataset(data.Dataset):
             self.mug_meta = cPickle.load(f)
 
         self.camera_intrinsics = np.array([[577.5, 0, 319.5], [0, 577.5, 239.5], [0, 0, 1]],
-                                          dtype=np.float)  # [fx, fy, cx, cy]
-        self.real_intrinsics = np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]], dtype=np.float)
+                                          dtype=float)  # [fx, fy, cx, cy]
+        self.real_intrinsics = np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]], dtype=float)
 
         self.invaild_list = []
         self.mug_sym = mmcv.load(os.path.join(self.data_dir, 'Real/train/mug_handle.pkl'))
@@ -216,7 +216,7 @@ class PoseDataset(data.Dataset):
         else:
             return self.__getitem__((index + 1) % self.__len__())
         coord = coord[:, :, (2, 1, 0)]
-        coord = np.array(coord, dtype=np.float32) / 255
+        coord = np.array(coord, dtype=float) / 255
         coord[:, :, 2] = 1 - coord[:, :, 2]
 
         # aggragate information about the selected object
@@ -236,7 +236,7 @@ class PoseDataset(data.Dataset):
             coord_2d, bbox_center, scale, FLAGS.img_size, interpolation=cv2.INTER_NEAREST
         ).transpose(2, 0, 1)
 
-        mask_target = mask.copy().astype(np.float)
+        mask_target = mask.copy().astype(float)
         mask_target[mask != inst_id] = 0.0
         mask_target[mask == inst_id] = 1.0
         # depth[mask_target == 0.0] = 0.0
@@ -264,7 +264,7 @@ class PoseDataset(data.Dataset):
         cat_id = gts['class_ids'][idx] - 1  # convert to 0-indexed
         # note that this is nocs model, normalized along diagonal axis
         model_name = gts['model_list'][idx]
-        model = self.models[gts['model_list'][idx]].astype(np.float32)  # 1024 points
+        model = self.models[gts['model_list'][idx]].astype(float)  # 1024 points
         nocs_scale = gts['scales'][idx]  # nocs_scale = image file / model file
         # fsnet scale (from model) scale residual
         fsnet_scale, mean_shape = self.get_fs_net_scale(self.id2cat_name[str(cat_id + 1)], model, nocs_scale)
@@ -284,25 +284,25 @@ class PoseDataset(data.Dataset):
         bb_aug, rt_aug_t, rt_aug_R = self.generate_aug_parameters()
 
         data_dict = {}
-        data_dict['roi_img'] = torch.as_tensor(roi_img.astype(np.float32)).contiguous()
-        data_dict['roi_depth'] = torch.as_tensor(roi_depth.astype(np.float32)).contiguous()
-        data_dict['dense_depth'] = torch.as_tensor(dense_depth.astype(np.float32)).contiguous()
-        data_dict['depth_normalize'] = torch.as_tensor(depth_normalize.astype(np.float32)).contiguous()
-        data_dict['cam_K'] = torch.as_tensor(out_camK.astype(np.float32)).contiguous()
-        data_dict['roi_mask'] = torch.as_tensor(roi_mask.astype(np.float32)).contiguous()
-        data_dict['cat_id'] = torch.as_tensor(cat_id, dtype=torch.float32).contiguous()
-        data_dict['rotation'] = torch.as_tensor(rotation, dtype=torch.float32).contiguous()
-        data_dict['translation'] = torch.as_tensor(translation, dtype=torch.float32).contiguous()
-        data_dict['fsnet_scale'] = torch.as_tensor(fsnet_scale, dtype=torch.float32).contiguous()
-        data_dict['sym_info'] = torch.as_tensor(sym_info.astype(np.float32)).contiguous()
-        data_dict['roi_coord_2d'] = torch.as_tensor(roi_coord_2d, dtype=torch.float32).contiguous()
-        data_dict['mean_shape'] = torch.as_tensor(mean_shape, dtype=torch.float32).contiguous()
-        data_dict['aug_bb'] = torch.as_tensor(bb_aug, dtype=torch.float32).contiguous()
-        data_dict['aug_rt_t'] = torch.as_tensor(rt_aug_t, dtype=torch.float32).contiguous()
-        data_dict['aug_rt_R'] = torch.as_tensor(rt_aug_R, dtype=torch.float32).contiguous()
-        data_dict['roi_mask_deform'] = torch.as_tensor(roi_mask_def, dtype=torch.float32).contiguous()
-        data_dict['model_point'] = torch.as_tensor(model, dtype=torch.float32).contiguous()
-        data_dict['nocs_scale'] = torch.as_tensor(nocs_scale, dtype=torch.float32).contiguous()
+        data_dict['roi_img'] = torch.as_tensor(roi_img.astype(float)).contiguous()
+        data_dict['roi_depth'] = torch.as_tensor(roi_depth.astype(float)).contiguous()
+        data_dict['dense_depth'] = torch.as_tensor(dense_depth.astype(float)).contiguous()
+        data_dict['depth_normalize'] = torch.as_tensor(depth_normalize.astype(float)).contiguous()
+        data_dict['cam_K'] = torch.as_tensor(out_camK.astype(float)).contiguous()
+        data_dict['roi_mask'] = torch.as_tensor(roi_mask.astype(float)).contiguous()
+        data_dict['cat_id'] = torch.as_tensor(cat_id, dtype=torch.float).contiguous()
+        data_dict['rotation'] = torch.as_tensor(rotation, dtype=torch.float).contiguous()
+        data_dict['translation'] = torch.as_tensor(translation, dtype=torch.float).contiguous()
+        data_dict['fsnet_scale'] = torch.as_tensor(fsnet_scale, dtype=torch.float).contiguous()
+        data_dict['sym_info'] = torch.as_tensor(sym_info.astype(float)).contiguous()
+        data_dict['roi_coord_2d'] = torch.as_tensor(roi_coord_2d, dtype=torch.float).contiguous()
+        data_dict['mean_shape'] = torch.as_tensor(mean_shape, dtype=torch.float).contiguous()
+        data_dict['aug_bb'] = torch.as_tensor(bb_aug, dtype=torch.float).contiguous()
+        data_dict['aug_rt_t'] = torch.as_tensor(rt_aug_t, dtype=torch.float).contiguous()
+        data_dict['aug_rt_R'] = torch.as_tensor(rt_aug_R, dtype=torch.float).contiguous()
+        data_dict['roi_mask_deform'] = torch.as_tensor(roi_mask_def, dtype=torch.float).contiguous()
+        data_dict['model_point'] = torch.as_tensor(model, dtype=torch.float).contiguous()
+        data_dict['nocs_scale'] = torch.as_tensor(nocs_scale, dtype=torch.float).contiguous()
 
         return data_dict
 
@@ -318,7 +318,7 @@ class PoseDataset(data.Dataset):
         dx = np.random.rand() * 2 * ax - ax
         dy = np.random.rand() * 2 * ay - ay
         dz = np.random.rand() * 2 * az - az
-        return np.array([ex, ey, ez], dtype=np.float32), np.array([dx, dy, dz], dtype=np.float32) / 1000.0, Rm
+        return np.array([ex, ey, ez], dtype=float), np.array([dx, dy, dz], dtype=float) / 1000.0, Rm
 
 
     def get_fs_net_scale(self, c, model, nocs_scale):
