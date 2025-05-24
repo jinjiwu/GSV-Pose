@@ -1,3 +1,4 @@
+from logging import Logger
 import os
 import random
 import time
@@ -33,7 +34,7 @@ def train(argv):
         os.makedirs(FLAGS.model_save)
     tf.compat.v1.disable_eager_execution()
     tb_writter = tf.compat.v1.summary.FileWriter(FLAGS.model_save)
-    logger = setup_logger("train_log", os.path.join(FLAGS.model_save, "log.txt"))
+    logger: Logger = setup_logger("train_log", os.path.join(FLAGS.model_save, "log.txt"))
     for key, value in vars(FLAGS).items():
         logger.info(key + ":" + str(value))
     Train_stage = "PoseNet_only"

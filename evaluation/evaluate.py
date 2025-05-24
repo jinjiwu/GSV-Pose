@@ -74,7 +74,7 @@ def evaluate(argv):
             start_time = time.time()
             draw_img(
                 f"eval_logs/roi_eval_{i}.png",
-                data["roi_img"].squeeze().permute(1, 2, 0).cpu().numpy(),
+                data["roi_img"][0].permute(1, 2, 0).cpu().numpy(),
             )
             output_dict = network(
                 rgb=data["roi_img"].to(device),
@@ -122,10 +122,20 @@ def evaluate(argv):
             # -------save result-----------
             autoSave = True
             if autoSave:
-                intrinsics = np.array(
-                    [[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]],
-                    dtype=np.float,
-                )
+                if FLAGS.our_camK:
+                    intrinsics = np.array(
+                        [[386.49, 0, 320.494], [0, 386.008, 236.679], [0, 0, 1]],
+                        dtype=np.float,
+                    )
+                    # intrinsics = np.array(
+                    #     [[385.964, 0, 320.494], [0, 385.484, 236.679], [0, 0, 1]],
+                    #     dtype=np.float,
+                    # )
+                else:
+                    intrinsics = np.array(
+                        [[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]],
+                        dtype=np.float,
+                    )
                 img = detection_dict["image_path"]
                 img_list = img.split("/")
                 img_scene = img_list[3]
@@ -150,6 +160,7 @@ def evaluate(argv):
                     detection_dict["gt_RTs"],
                     detection_dict["gt_scales"],
                     detection_dict["gt_class_ids"],
+                    draw_gt=not FLAGS.our_camK,
                 )
                 pc = output_dict["recon"].detach()
                 print(pc.shape)

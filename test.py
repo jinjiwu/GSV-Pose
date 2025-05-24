@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.use("TkAgg")  # 在代码开头设置
+# matplotlib.use("TkAgg")  # 在代码开头设置
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
@@ -18,7 +18,8 @@ plt.plot(pts[..., 0], pts[..., 1], "ro")
 plt.plot(rrcc[..., 0], rrcc[..., 1], "bo")
 plt.show()
 
-# img = cv2.imread("img/0000_mask.png")
+# p = "our_rgbd/original/rgb_2_mask.png"
+# img = cv2.imread(p)
 # mask = 255 - img
-# maks_bool = mask > 0
-# cv2.imwrite("img/0000_mask_o.png", mask)
+# mask_bool = mask > 0
+# cv2.imwrite(p, mask)

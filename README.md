@@ -14,13 +14,9 @@ PyTorch implementation of the paper: Pose Estimation Method Based on Geometric S
 ## Installing
 
 - 使用conda创建虚拟环境
-`conda create -n gsvpose python=3.10`, Install the main requirements in 'requirement.txt'.
+`conda create -n gsvpose python=3.8`, Install the main requirements in 'requirement.txt'.
 - Install [Detectron2](https://github.com/facebookresearch/detectron2).
-- Install [GeoTransformer](https://github.com/qinzheng93/GeoTransformer.git), download the source code and unzip it to the same directory and run the following command:
-```bash
-# pip install -e GeoTransformer-1.0.0
-cd network && pip install -e .
-```
+- 提供了自己修改版的 [GeoTransformer](https://github.com/qinzheng93/GeoTransformer.git), Download GeoTransformer's pre-trained weights in this [link](https://github.com/qinzheng93/GeoTransformer/releases)
 
 ## Data Preparation
 - Download the data provided by [NOCS](https://github.com/hughw19/NOCS_CVPR2019) ([real_train](http://download.cs.stanford.edu/orion/nocs/real_train.zip), [real_test](http://download.cs.stanford.edu/orion/nocs/real_test.zip),
@@ -42,43 +38,33 @@ data
     ├── real_train
     └── real_test
 ```
-Download the pre-trained models, segmentation results from Mask R-CNN, and predictions of NOCS from [here](https://drive.google.com/file/d/1p72NdY4Bie_sra9U8zoUNI4fTrQZdbnc/view?usp=sharing), Then run python scripts to prepare the datasets.
+Run the following scripts to prepare training instances:
 
 ```bash
-unzip deformnet_eval.zip
-mv deformnet_eval results
-
-python preprocess/shape_data.py
-python preprocess/pose_data.py
+cd provider
+python training_data_prepare.py
 ```
-其中有垃圾数据需要去掉
-`data/obj_models/val/02876657/d3b53f56b4a7b3b3c9f016d57db96408`
-
-
-```bash
-
-```
-
-Download GeoTransformer's pre-trained weights in this [link](https://github.com/qinzheng93/GeoTransformer/releases)
-
-将GPV-Pose下载的mug_handle.pkl移动到`data/Real/train`目录下.
-
-## model
-Download the trained model from this [link](https://drive.google.com/drive/folders/1GrCYZIJPPrtozOUS8MHI0Y1dbxn6Kl2-?usp=sharing).
 
 ## Training
-Please note, some details are changed from the original paper for more efficient training. 
 
-Specify the dataset directory and run the following command.
+Specify the dataset directory and run the following command. `SAVE_DIR` is the directory to save the trained model. 
 ```shell
-python -m engine.train --dataset_dir YOUR_DATA_DIR --dataset YOUR_DATASET --model_save SAVE_DIR
+python -m engine.train --dataset_dir ./data --dataset Real --model_save SAVE_DIR
 ```
 
-Detailed configurations are in 'config/config.py'.
+More detailed configurations are in 'config/config.py'.
+
+Our trained model can be download from this [link](https://drive.google.com/drive/folders/1GrCYZIJPPrtozOUS8MHI0Y1dbxn6Kl2-?usp=sharing). 下载之后放到`pretrain`目录下。
 
 ## Evaluation
+对NOCS数据集中的val数据集进行评估，使用以下命令。
 ```shell
-python -m evaluation.evaluate --data_dir YOUR_DATA_DIR --resume 1 --resume_model MODEL_PATH --model_save SAVE_DIR
+python -m evaluation.evaluate --dataset_dir YOUR_DATA_DIR --resume 1 --resume_model pretrain/gpv_pose_update.pth --model_save eval_logs
+```
+
+我们提供了可供测试的真实数据，我们的真实数据组织方式和[NOCS](https://github.com/hughw19/NOCS_CVPR2019)一致。测试命令为
+```shell
+python -m evaluation.evaluate --dataset_dir ./our_rgbd --resume 1 --resume_model pretrain/gpv_pose_update.pth --model_save eval_logs --our_camK True --draw_gt False
 ```
 
 ## Acknowledgment

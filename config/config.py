@@ -143,6 +143,8 @@ flags.DEFINE_integer("resume_point", 0, "the epoch to continue the training")
 ###################for evaluation#################
 flags.DEFINE_integer("eval_visualize_pcl", 0, "save pcl when evaluation")
 flags.DEFINE_integer("eval_inference_only", 0, "inference without evaluation")
+flags.DEFINE_boolean("draw_gt", True, "draw gt")
+flags.DEFINE_boolean("our_camK", False, "use our camera intrinsic")
 
 ###################snapshot#################
 # flags.DEFINE_integer('test_epoch', 20, 'save pcl when evaluation')

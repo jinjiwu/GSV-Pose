@@ -868,7 +868,7 @@ def draw_detections(
             projected_bbox = calculate_2d_projections(transformed_bbox_3d, intrinsics)
             img = draw_bboxes(img, projected_bbox, (255, 0, 0))
     # darw ground truth - GREEN color
-    if draw_gt and False:
+    if draw_gt:
         for i in range(gt_sRT.shape[0]):
             if gt_class_ids[i] in [1, 2, 4]:
                 sRT = align_rotation(gt_sRT[i, :, :])

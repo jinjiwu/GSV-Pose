@@ -185,18 +185,28 @@ class PoseDataset(data.Dataset):
             self.mug_meta = cPickle.load(f)
 
         # TODO: 使用d457相机内参
-        self.real_intrinsics = np.array(
-            [[386.49, 0, 320.494], [0, 386.008, 236.679], [0, 0, 1]],
-            dtype=np.float,
-        )
+        # self.real_intrinsics = np.array(
+        #     [[386.49, 0, 320.494], [0, 386.008, 236.679], [0, 0, 1]],
+        #     dtype=np.float,
+        # )
 
         self.camera_intrinsics = np.array(
             [[577.5, 0, 319.5], [0, 577.5, 239.5], [0, 0, 1]], dtype=np.float
         )  # [fx, fy, cx, cy]
-        # self.real_intrinsics = np.array(
-        #     [[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]],
-        #     dtype=np.float,
-        # )
+        if FLAGS.our_camK:
+            self.real_intrinsics = np.array(
+                [[386.49, 0, 320.494], [0, 386.008, 236.679], [0, 0, 1]],
+                dtype=np.float,
+            )
+            # self.real_intrinsics = np.array(
+            #     [[385.964, 0, 320.494], [0, 385.484, 236.679], [0, 0, 1]],
+            #     dtype=np.float,
+            # )
+        else:
+            self.real_intrinsics = np.array(
+                [[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]],
+                dtype=np.float,
+            )
 
         self.invaild_list = []
 
