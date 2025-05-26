@@ -8,7 +8,7 @@ tensorflow-estimator==2.7.0
 tensorflow-io-gcs-filesystem==0.23.0
 # detectron2==0.6+cu113
 https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.11.0_cu113/kaolin-0.11.0-cp38-cp38-manylinux1_x86_64.whl
-
+https://data.pyg.org/whl/torch-1.10.0%2Bcu113/torch_scatter-2.0.9-cp38-cp38-linux_x86_64.whl
 
 absl-py==1.0.0
 addict==2.4.0

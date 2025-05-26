@@ -24,6 +24,7 @@ import time
 # from creating log
 import tensorflow as tf
 from tools.eval_utils import setup_logger, compute_sRT_errors
+from tools.timer import timer_epoch
 
 torch.autograd.set_detect_anomaly(True)
 device = "cuda"
@@ -34,7 +35,9 @@ def train(argv):
         os.makedirs(FLAGS.model_save)
     tf.compat.v1.disable_eager_execution()
     tb_writter = tf.compat.v1.summary.FileWriter(FLAGS.model_save)
-    logger: Logger = setup_logger("train_log", os.path.join(FLAGS.model_save, "log.txt"))
+    logger: Logger = setup_logger(
+        "train_log", os.path.join(FLAGS.model_save, "log.txt")
+    )
     for key, value in vars(FLAGS).items():
         logger.info(key + ":" + str(value))
     Train_stage = "PoseNet_only"
@@ -119,6 +122,7 @@ def train(argv):
 
         #################################
         for i, data in enumerate(train_dataloader, 1):
+            timer_epoch.start("epoch")
             output_dict, loss_dict = network(
                 rgb=data["roi_img"].to(device),
                 depth=data["roi_depth"].to(device),
@@ -161,7 +165,10 @@ def train(argv):
             else:
                 total_loss.backward()
                 torch.nn.utils.clip_grad_norm_(network.parameters(), 5)
-
+            timer_epoch.stop("epoch")
+            if i % 1 == 0:
+                summ_time, elapsed_time = timer_epoch.summary()
+                logger.info(f"summary time: {summ_time}, elapsed time: {elapsed_time}")
             global_step += 1
             summary = tf.compat.v1.Summary(
                 value=[
