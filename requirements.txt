@@ -1,5 +1,12 @@
 # conda install nvidia/label/cuda-11.3.1::cuda
 # pip install torch==1.10.1+cu113 torchvision==0.11.2+cu113 torchaudio==0.10.1 --extra-index-url https://download.pytorch.org/whl/cu113
+# 1. 首先指定额外的索引 URL
+--extra-index-url https://download.pytorch.org/whl/cu113
+
+# 2. 然后列出每个包和其确切的版本
+torch==1.10.1+cu113
+torchvision==0.11.2+cu113
+torchaudio==0.10.1
 tensorboard==2.7.0
 tensorboard-data-server==0.6.1
 tensorboard-plugin-wit==1.8.1
@@ -7,6 +14,7 @@ tensorflow==2.7.1
 tensorflow-estimator==2.7.0
 tensorflow-io-gcs-filesystem==0.23.0
 # detectron2==0.6+cu113
+-e ./external/detectron2
 https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.11.0_cu113/kaolin-0.11.0-cp38-cp38-manylinux1_x86_64.whl
 https://data.pyg.org/whl/torch-1.10.0%2Bcu113/torch_scatter-2.0.9-cp38-cp38-linux_x86_64.whl
 

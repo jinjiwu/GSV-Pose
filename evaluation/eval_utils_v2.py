@@ -9,6 +9,7 @@ import math
 import os
 from ctypes import *
 from pprint import pprint
+from collections import defaultdict
 
 import cv2
 import matplotlib.pyplot as plt
@@ -342,6 +343,7 @@ def compute_3d_matches(
     num_iou_3d_thres = len(iou_3d_thresholds)
     pred_matches = -1 * np.ones([num_iou_3d_thres, num_pred])
     gt_matches = -1 * np.ones([num_iou_3d_thres, num_gt])
+    iou_3d = -1 * np.ones((max(num_gt, 1), 1), dtype=np.float32)
 
     for s, iou_thres in enumerate(iou_3d_thresholds):
         for i in range(len(pred_boxes)):
@@ -360,103 +362,7 @@ def compute_3d_matches(
                     continue
                 # If we reach IoU smaller than the threshold, end the loop
                 iou = overlaps[i, j]
-                # print('iou: ', iou)
-                if iou < iou_thres:
-                    break
-                # Do we have a match?
-                if not pred_class_ids[i] == gt_class_ids[j]:
-                    continue
-
-                if iou > iou_thres:
-                    gt_matches[s, j] = i
-                    pred_matches[s, i] = j
-                    break
-
-    return gt_matches, pred_matches, overlaps, indices
-
-
-def compute_3d_matches_nosiy(
-    gt_class_ids,
-    gt_RTs,
-    gt_scales,
-    gt_handle_visibility,
-    synset_names,
-    pred_boxes,
-    pred_class_ids,
-    pred_scores,
-    pred_RTs,
-    pred_scales,
-    iou_3d_thresholds,
-    score_threshold=0,
-):
-    """Finds matches between prediction and ground truth instances.
-    Returns:
-        gt_matches: 2-D array. For each GT box it has the index of the matched
-                  predicted box.
-        pred_matches: 2-D array. For each predicted box, it has the index of
-                    the matched ground truth box.
-        overlaps: [pred_boxes, gt_boxes] IoU overlaps.
-    """
-    # Trim zero padding
-    # TODO: cleaner to do zero unpadding upstream
-    num_pred = len(pred_class_ids)
-    num_gt = len(gt_class_ids)
-    indices = np.zeros(0)
-
-    if num_pred:
-        pred_boxes = trim_zeros(pred_boxes).copy()
-        pred_scores = pred_scores[: pred_boxes.shape[0]].copy()
-
-        # Sort predictions by score from high to low
-        indices = np.argsort(pred_scores)[::-1]
-
-        pred_boxes = pred_boxes[indices].copy()
-        pred_class_ids = pred_class_ids[indices].copy()
-        pred_scores = pred_scores[indices].copy()
-        pred_scales = pred_scales[indices].copy()
-        pred_RTs = pred_RTs[indices].copy()
-
-    # Compute IoU overlaps [pred_bboxs gt_bboxs]
-    # overlaps = [[0 for j in range(num_gt)] for i in range(num_pred)]
-    overlaps = np.zeros((num_pred, num_gt), dtype=np.float32)
-    for i in range(num_pred):
-        for j in range(num_gt):
-            # overlaps[i, j] = compute_3d_iou(pred_3d_bboxs[i], gt_3d_bboxs[j], gt_handle_visibility[j],
-            #    synset_names[pred_class_ids[i]], synset_names[gt_class_ids[j]])
-            overlaps[i, j] = compute_3d_iou_new(
-                pred_RTs[i],
-                gt_RTs[j],
-                pred_scales[i, :],
-                gt_scales[j],
-                gt_handle_visibility[j],
-                synset_names[pred_class_ids[i]],
-                synset_names[gt_class_ids[j]],
-            )
-
-    # Loop through predictions and find matching ground truth boxes
-    num_iou_3d_thres = len(iou_3d_thresholds)
-    pred_matches = -1 * np.ones([num_iou_3d_thres, num_pred])
-    gt_matches = -1 * np.ones([num_iou_3d_thres, num_gt])
-    iou_3d = -1 * np.ones((num_iou_3d_thres, num_gt), dtype=np.float32)
-
-    for s, iou_thres in enumerate(iou_3d_thresholds):
-        for i in range(len(pred_boxes)):
-            # Find best matching ground truth box
-            # 1. Sort matches by score
-            sorted_ixs = np.argsort(overlaps[i])[::-1]
-            # 2. Remove low scores
-            low_score_idx = np.where(overlaps[i, sorted_ixs] < score_threshold)[0]
-            if low_score_idx.size > 0:
-                sorted_ixs = sorted_ixs[: low_score_idx[0]]
-            # 3. Find the match
-            for j in sorted_ixs:
-                # If ground truth box is already matched, go to next one
-                # print('gt_match: ', gt_match[j])
-                if gt_matches[s, j] > -1:
-                    continue
-                # If we reach IoU smaller than the threshold, end the loop
-                iou = overlaps[i, j]
-                iou_3d[s, j] = iou
+                iou_3d[j] = iou
                 # print('iou: ', iou)
                 if iou < iou_thres:
                     break
@@ -539,9 +445,10 @@ def compute_match_from_degree_cm(
 
     pred_matches = -1 * np.ones((num_degree_thres, num_shift_thres, num_pred))
     gt_matches = -1 * np.ones((num_degree_thres, num_shift_thres, num_gt))
+    degree_cm = -1 * np.ones([max(num_gt, 1), 2])
 
     if num_pred == 0 or num_gt == 0:
-        return gt_matches, pred_matches
+        return gt_matches, pred_matches, degree_cm
 
     assert num_pred == overlaps.shape[0]
     assert num_gt == overlaps.shape[1]
@@ -564,6 +471,7 @@ def compute_match_from_degree_cm(
                     # print(j, len(gt_match), len(pred_class_ids), len(gt_class_ids))
                     if gt_matches[d, s, j] > -1 or pred_class_ids[i] != gt_class_ids[j]:
                         continue
+                    degree_cm[j, :] = overlaps[i, j, :]
                     # If we reach IoU smaller than the threshold, end the loop
                     if (
                         overlaps[i, j, 0] > degree_thres
@@ -575,7 +483,7 @@ def compute_match_from_degree_cm(
                     pred_matches[d, s, i] = j
                     break
 
-    return gt_matches, pred_matches
+    return gt_matches, pred_matches, degree_cm
 
 
 def compute_degree_cm_mAP(
@@ -630,9 +538,8 @@ def compute_degree_cm_mAP(
     # loop over results to gather pred matches and gt matches for iou and pose metrics
     progress = tqdm(final_results, desc="eval")
     # for progress, result in enumerate(final_results):
-    eval_dict = {}
+    eval_dict = defaultdict(dict)
     for result in progress:
-        eval_dict[result["image_id"]] = {}
         # print(progress, len(final_results))
         gt_class_ids = result["gt_class_ids"].astype(np.int32)
         gt_RTs = np.array(result["gt_RTs"])
@@ -649,6 +556,8 @@ def compute_degree_cm_mAP(
         if len(gt_class_ids) == 0 and len(pred_class_ids) == 0:
             continue
 
+        iou_3d_gt_list = []
+        degree_cm_list = []
         for cls_id in range(1, num_classes):
             # get gt and predictions in this class
             cls_gt_class_ids = (
@@ -703,7 +612,7 @@ def compute_degree_cm_mAP(
                     else np.ones(0)
                 )
 
-            iou_cls_gt_match, iou_cls_pred_match, _, iou_pred_indices = (
+            iou_cls_gt_match, iou_cls_pred_match, _, iou_pred_indices, iou_3d = (
                 compute_3d_matches(
                     cls_gt_class_ids,
                     cls_gt_RTs,
@@ -718,6 +627,8 @@ def compute_degree_cm_mAP(
                     iou_thres_list,
                 )
             )
+            iou_3d_gt_list.append(iou_3d)
+
             if len(iou_pred_indices):
                 cls_pred_class_ids = cls_pred_class_ids[iou_pred_indices]
                 cls_pred_RTs = cls_pred_RTs[iou_pred_indices]
@@ -791,13 +702,16 @@ def compute_degree_cm_mAP(
                 synset_names,
             )
 
-            pose_cls_gt_match, pose_cls_pred_match = compute_match_from_degree_cm(
-                RT_overlaps,
-                cls_pred_class_ids,
-                cls_gt_class_ids,
-                degree_thres_list,
-                shift_thres_list,
+            pose_cls_gt_match, pose_cls_pred_match, degree_cm = (
+                compute_match_from_degree_cm(
+                    RT_overlaps,
+                    cls_pred_class_ids,
+                    cls_gt_class_ids,
+                    degree_thres_list,
+                    shift_thres_list,
+                )
             )
+            degree_cm_list.append(degree_cm)
 
             pose_pred_matches_all[cls_id] = np.concatenate(
                 (pose_pred_matches_all[cls_id], pose_cls_pred_match), axis=-1
@@ -819,6 +733,15 @@ def compute_degree_cm_mAP(
                 (pose_gt_matches_all[cls_id], pose_cls_gt_match), axis=-1
             )
 
+        eval_dict[result["image_path"]]["RT"] = {
+            "degree_thres_list": degree_thres_list,
+            "shift_thres_list": shift_thres_list,
+            "degree_cm": np.concatenate(degree_cm_list),
+        }
+        eval_dict[result["image_path"]]["iou"] = {
+            "iou_thres_list": iou_thres_list,
+            "iou_3d": np.concatenate(iou_3d_gt_list),
+        }
     # draw iou 3d AP vs. iou thresholds
     fig_iou = plt.figure(figsize=(30, 10))
     # ax_iou = plt.subplot(111)
@@ -960,7 +883,7 @@ def compute_degree_cm_mAP(
     # pprint(kind_result)
     # with open(os.path.join(log_dir, "eval_result.json"), "w") as f:
     #     json.dump(kind_result, f, indent=4)
-    return iou_3d_aps, pose_aps
+    return iou_3d_aps, pose_aps, eval_dict
 
 
 color_map = [

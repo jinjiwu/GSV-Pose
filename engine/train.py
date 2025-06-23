@@ -11,12 +11,13 @@ sys.path.append(str(Path(__file__).resolve().parent.parent / "network"))
 import mmcv
 import torch
 from absl import app
+from absl import flags
+
 
 from config.config import *
 from tools.training_utils import build_lr_rate, get_gt_v, build_optimizer
 from network.GPVPose import GPVPose
 
-FLAGS = flags.FLAGS
 from datasets.load_data import PoseDataset
 import numpy as np
 import time
@@ -28,6 +29,8 @@ from tools.timer import timer_epoch
 
 torch.autograd.set_detect_anomaly(True)
 device = "cuda"
+
+FLAGS = flags.FLAGS
 
 
 def train(argv):
